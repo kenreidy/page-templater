@@ -72,6 +72,10 @@ class PageTemplater {
 			array( $this, 'view_project_template') 
 		);
 
+		add_filter(
+			'acf/location/rule_values/page_template',
+			array( $this, 'acf_page_templates_rules_values')
+		);
 
 		// Add your templates to this array.
 		$this->templates = array(
@@ -154,6 +158,21 @@ class PageTemplater {
 		// Return template
 		return $template;
 
+	}
+	
+	public function acf_page_templates_rules_values( $choices ) {
+		$templates = wp_get_theme()->get_page_templates();
+		if ( empty( $templates ) ) {
+			$templates = array();
+		}
+
+		$templates = array_merge( $templates, $this->templates );
+
+		foreach( $templates as $key => $value ) {
+			$choices[ $key ] = $value;
+		}
+
+		return $choices;
 	}
 
 } 
