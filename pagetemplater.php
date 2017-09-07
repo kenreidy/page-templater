@@ -2,7 +2,7 @@
 /*
 Plugin Name: Page Template Plugin : 'Good To Be Bad'
 Plugin URI: http://www.wpexplorer.com/wordpress-page-templates-plugin/
-Version: 1.1.0
+Version: 1.2.0
 Author: WPExplorer
 Author URI: http://www.wpexplorer.com/
 */
@@ -18,6 +18,11 @@ class PageTemplater {
 	 * The array of templates that this plugin tracks.
 	 */
 	protected $templates;
+    
+	/**
+	 * Subdirectory to find the templates.
+	 */
+	protected $templates_dir;
 
 	/**
 	 * Returns an instance of this class. 
@@ -38,7 +43,9 @@ class PageTemplater {
 	private function __construct() {
 
 		$this->templates = array();
-
+        
+		// Set the templates dir to the plugin dir, ensuring that it has a trailing slash.
+		$this->templates_dir = trailingslashit( apply_filters( 'pagetemplater_templates_dir', '.' ) );
 
 		// Add a filter to the attributes metabox to inject template into the cache.
 		if ( version_compare( floatval( get_bloginfo( 'version' ) ), '4.7', '<' ) ) {
@@ -77,11 +84,27 @@ class PageTemplater {
 			array( $this, 'acf_page_templates_rules_values')
 		);
 
+		// Get the list of templates dynamically.
+		$templates_path = plugin_dir_path( __FILE__ ) . $this->templates_dir;
+		$plugin_file = basename( __FILE__ );
+		$all_files = scandir( $templates_path );
+		$template_files = array();
+		foreach ( $all_files as $file ) {
+			// Don't examine this file because the reg ex below will match it.
+			if ( $plugin_file == $file ) {
+				continue;
+			}
+			if ( preg_match( '/\.php$/', $file ) ) {
+				// Read the template name from the file.
+				if ( preg_match( '|Template Name:(.*)$|mi', file_get_contents( $templates_path . $file ), $header ) ) {
+					// Add filename and template name to templates list.
+					$template_files[ $this->templates_dir . $file ] = _cleanup_header_comment( $header[ 1 ] );
+				}
+			}
+		}
+        
 		// Add your templates to this array.
-		$this->templates = array(
-			'goodtobebad-template.php' => 'It\'s Good to Be Bad',
-		);
-			
+		$this->templates = apply_filters( 'pagetemplater_templates_found', $template_files );
 	} 
 
 	/**
@@ -107,7 +130,7 @@ class PageTemplater {
 		$templates = wp_get_theme()->get_page_templates();
 		if ( empty( $templates ) ) {
 			$templates = array();
-		} 
+		}
 
 		// New cache, therefore remove the old one
 		wp_cache_delete( $cache_key , 'themes');
@@ -128,7 +151,11 @@ class PageTemplater {
 	 * Checks if the template is assigned to the page
 	 */
 	public function view_project_template( $template ) {
-		
+		// Return the search template if we're searching (instead of the template for the first result)
+		if ( is_search() ) {
+			return $template;
+		}
+
 		// Get global post
 		global $post;
 
@@ -152,6 +179,7 @@ class PageTemplater {
 		if ( file_exists( $file ) ) {
 			return $file;
 		} else {
+			// Template file not found.
 			echo $file;
 		}
 
